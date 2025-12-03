@@ -56,6 +56,7 @@
             <div class="info">
                 <h3>Jogador 1</h3>
                 <p>WASD: Mover</p>
+                <p>Espaço: Pular</p>
             </div>
             <canvas id="canvas1"></canvas>
         </div>
@@ -63,6 +64,7 @@
             <div class="info">
                 <h3>Jogador 2</h3>
                 <p>Setas: Mover</p>
+                <p>Enter: Pular</p>
             </div>
             <canvas id="canvas2"></canvas>
         </div>
@@ -170,12 +172,12 @@ function quad(a,b,c,d,color){
 quad([-5,0,0],[5,0,0],[5,0,-80],[-5,0,-80],[0.82,0.82,0.75]);
 
 // Teto
-quad([-5,3,0],[5,3,0],[5,3,-80],[-5,3,-80],[0.9,0.88,0.85]);
+quad([-5,6,0],[5,6,0],[5,6,-80],[-5,6,-80],[0.9,0.88,0.85]);
 
 // Paredes
-quad([-5,0,0],[-5,3,0],[-5,3,-80],[-5,0,-80],[0.95,0.9,0.85]);
-quad([5,0,0],[5,3,0],[5,3,-80],[5,0,-80],[0.95,0.9,0.85]);
-quad([-5,0,-80],[5,0,-80],[5,3,-80],[-5,3,-80],[0.95,0.95,0.95]);
+quad([-5,0,0],[-5,6,0],[-5,6,-80],[-5,0,-80],[0.95,0.9,0.85]);
+quad([5,0,0],[5,6,0],[5,6,-80],[5,0,-80],[0.95,0.9,0.85]);
+quad([-5,0,-80],[5,0,-80],[5,6,-80],[-5,6,-80],[0.95,0.95,0.95]);
 
 // ============ OBJETO MESA 3D =============
 function addCube(x,y,z, w,h,d, color) {
@@ -183,6 +185,30 @@ function addCube(x,y,z, w,h,d, color) {
         [x-w, y-h, z-d], [x+w, y-h, z-d], [x+w, y+h, z-d], [x-w, y+h, z-d],
         [x-w, y-h, z+d], [x+w, y-h, z+d], [x+w, y+h, z+d], [x-w, y+h, z+d],
     ];
+    quad(v[0],v[1],v[2],v[3],color);
+    quad(v[1],v[5],v[6],v[2],color);
+    quad(v[5],v[4],v[7],v[6],color);
+    quad(v[4],v[0],v[3],v[7],color);
+    quad(v[3],v[2],v[6],v[7],color);
+    quad(v[0],v[4],v[5],v[1],color);
+}
+
+function addRotatedCube(x, y, z, w, h, d, color, rotation) {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    
+    const corners = [
+        [-w, -h, -d], [w, -h, -d], [w, h, -d], [-w, h, -d],
+        [-w, -h, d], [w, -h, d], [w, h, d], [-w, h, d]
+    ];
+    
+    const tCorners = corners.map(p => {
+        const rx = p[0] * cos - p[2] * sin;
+        const rz = p[0] * sin + p[2] * cos;
+        return [x + rx, y + p[1], z + rz];
+    });
+    
+    const v = tCorners;
     quad(v[0],v[1],v[2],v[3],color);
     quad(v[1],v[5],v[6],v[2],color);
     quad(v[5],v[4],v[7],v[6],color);
@@ -212,33 +238,59 @@ for (let i = 6; i < 75; i += 8) {
 const sceneVertexCount = vertices.length;
 
 // ============ PERSONAGENS =============
-function addCharacter(offsetX, offsetZ, skinColor, shirtColor, pantsColor, hairColor, eyeColor) {
-    const baseY = 0;
+function addCharacter(px, pz, skinColor, shirtColor, pantsColor, hairColor, eyeColor, rotation = 0, walkTime = 0, py = 0) {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+
+    function drawPart(rx, ry, rz, w, h, d, col) {
+        const worldX = px + (rx * cos - rz * sin);
+        const worldZ = pz + (rx * sin + rz * cos);
+        const worldY = py + ry;
+        addRotatedCube(worldX, worldY, worldZ, w, h, d, col, rotation);
+    }
+
+    const legAmp = 0.2;
+    const legL = Math.sin(walkTime) * legAmp;
+    const legR = Math.sin(walkTime + Math.PI) * legAmp;
+    const armL = Math.sin(walkTime + Math.PI) * legAmp;
+    const armR = Math.sin(walkTime) * legAmp;
+
+    // Head
+    drawPart(0, 2.4, 0, 0.4, 0.4, 0.4, skinColor);
+    // Hair
+    drawPart(0, 2.75, 0, 0.45, 0.1, 0.45, hairColor);
+    drawPart(0, 2.5, -0.4, 0.45, 0.3, 0.05, hairColor);
+    // Eyes
+    drawPart(-0.15, 2.5, 0.4, 0.1, 0.08, 0.02, [1,1,1]);
+    drawPart(0.15, 2.5, 0.4, 0.1, 0.08, 0.02, [1,1,1]);
+    drawPart(-0.15, 2.5, 0.41, 0.05, 0.05, 0.02, eyeColor);
+    drawPart(0.15, 2.5, 0.41, 0.05, 0.05, 0.02, eyeColor);
+    // Mouth
+    drawPart(0, 2.2, 0.4, 0.15, 0.04, 0.02, [0.4,0.2,0.1]);
+
+    // Body
+    drawPart(0, 1.5, 0, 0.4, 0.5, 0.2, shirtColor);
+
+    // Arms
+    drawPart(-0.5, 1.5, armL, 0.15, 0.5, 0.15, skinColor);
+    drawPart(0.5, 1.5, armR, 0.15, 0.5, 0.15, skinColor);
+
+    // Legs
+    drawPart(-0.15, 0.5, legL, 0.15, 0.5, 0.15, pantsColor);
+    drawPart(0.15, 0.5, legR, 0.15, 0.5, 0.15, pantsColor);
     
-    addCube(offsetX, baseY + 2.4, offsetZ, 0.4, 0.4, 0.4, skinColor);
-    addCube(offsetX, baseY + 1.5, offsetZ, 0.4, 0.5, 0.2, shirtColor);
-    addCube(offsetX - 0.5, baseY + 1.5, offsetZ, 0.15, 0.5, 0.15, skinColor);
-    addCube(offsetX + 0.5, baseY + 1.5, offsetZ, 0.15, 0.5, 0.15, skinColor);
-    addCube(offsetX - 0.15, baseY + 0.5, offsetZ, 0.15, 0.5, 0.15, pantsColor);
-    addCube(offsetX + 0.15, baseY + 0.5, offsetZ, 0.15, 0.5, 0.15, pantsColor);
-    addCube(offsetX, baseY + 2.75, offsetZ, 0.45, 0.1, 0.45, hairColor);
-    addCube(offsetX, baseY + 2.5, offsetZ - 0.4, 0.45, 0.3, 0.05, hairColor);
-    addCube(offsetX - 0.15, baseY + 2.5, offsetZ + 0.4, 0.1, 0.08, 0.02, [1,1,1]);
-    addCube(offsetX + 0.15, baseY + 2.5, offsetZ + 0.4, 0.1, 0.08, 0.02, [1,1,1]);
-    addCube(offsetX - 0.15, baseY + 2.5, offsetZ + 0.41, 0.05, 0.05, 0.02, eyeColor);
-    addCube(offsetX + 0.15, baseY + 2.5, offsetZ + 0.41, 0.05, 0.05, 0.02, eyeColor);
-    addCube(offsetX, baseY + 2.2, offsetZ + 0.4, 0.15, 0.04, 0.02, [0.4,0.2,0.1]);
-    addCube(offsetX - 0.15, baseY + 0.1, offsetZ, 0.18, 0.1, 0.18, [0.1,0.1,0.1]);
-    addCube(offsetX + 0.15, baseY + 0.1, offsetZ, 0.18, 0.1, 0.18, [0.1,0.1,0.1]);
+    // Feet
+    drawPart(-0.15, 0.1, legL, 0.18, 0.1, 0.18, [0.1,0.1,0.1]);
+    drawPart(0.15, 0.1, legR, 0.18, 0.1, 0.18, [0.1,0.1,0.1]);
 }
 
 // ============== POSIÇÕES DOS JOGADORES ==================
-let player1 = { x: -1, z: -5 };
-let player2 = { x: 1, z: -5 };
+let player1 = { x: -1, y: 0, z: -5, vy: 0, rotation: Math.PI, walkTime: 0 };
+let player2 = { x: 1, y: 0, z: -5, vy: 0, rotation: Math.PI, walkTime: 0 };
 
 // Adicionar personagens iniciais
-addCharacter(player1.x, player1.z, [0.9, 0.7, 0.6], [0.0, 0.6, 0.7], [0.2, 0.2, 0.7], [0.25, 0.15, 0.1], [0.2, 0.2, 0.8]);
-addCharacter(player2.x, player2.z, [0.95, 0.8, 0.7], [0.8, 0.1, 0.1], [0.3, 0.3, 0.3], [0.9, 0.8, 0.2], [0.0, 0.6, 0.0]);
+addCharacter(player1.x, player1.z, [0.9, 0.7, 0.6], [0.0, 0.6, 0.7], [0.2, 0.2, 0.7], [0.25, 0.15, 0.1], [0.2, 0.2, 0.8], player1.rotation, player1.walkTime, player1.y);
+addCharacter(player2.x, player2.z, [0.95, 0.8, 0.7], [0.8, 0.1, 0.1], [0.3, 0.3, 0.3], [0.9, 0.8, 0.2], [0.0, 0.6, 0.0], player2.rotation, player2.walkTime, player2.y);
 
 // =============== BUFFERS ===============
 function setupBuffers(gl, program) {
@@ -274,33 +326,122 @@ let buffers1 = setupBuffers(gl1, program1);
 let buffers2 = setupBuffers(gl2, program2);
 
 // ============== CONTROLES ==================
-const moveSpeed = 0.1;
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
 
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'w' || e.key === 'W') player1.z -= moveSpeed;
-    if (e.key === 's' || e.key === 'S') player1.z += moveSpeed;
-    if (e.key === 'a' || e.key === 'A') player1.x -= moveSpeed;
-    if (e.key === 'd' || e.key === 'D') player1.x += moveSpeed;
+function updatePhysics() {
+    const speed = 0.1;
+    const autoSpeed = 0.15;
+    const jumpForce = 0.2;
+    const gravity = 0.01;
+
+    // Player 1
+    let dx1 = 0;
+    // Auto-run
+    player1.z -= autoSpeed;
     
-    if (e.key === 'ArrowUp') player2.z -= moveSpeed;
-    if (e.key === 'ArrowDown') player2.z += moveSpeed;
-    if (e.key === 'ArrowLeft') player2.x -= moveSpeed;
-    if (e.key === 'ArrowRight') player2.x += moveSpeed;
+    if (keys['a'] || keys['A']) { dx1 -= speed; }
+    if (keys['d'] || keys['D']) { dx1 += speed; }
     
+    player1.x += dx1;
+    // Rotation based on lateral movement + forward movement
+    // Forward is -Z. If moving left (-X), angle is slightly left.
+    // atan2(dx, dz): dz is always -autoSpeed
+    player1.rotation = Math.atan2(dx1, -autoSpeed);
+    player1.walkTime += 0.2;
+
+    if (keys[' '] && player1.y === 0) {
+        player1.vy = jumpForce;
+    }
+    
+    player1.y += player1.vy;
+    player1.vy -= gravity;
+    if (player1.y < 0) {
+        player1.y = 0;
+        player1.vy = 0;
+    }
+
+    // Player 2
+    let dx2 = 0;
+    // Auto-run
+    player2.z -= autoSpeed;
+
+    if (keys['ArrowLeft']) { dx2 -= speed; }
+    if (keys['ArrowRight']) { dx2 += speed; }
+
+    player2.x += dx2;
+    player2.rotation = Math.atan2(dx2, -autoSpeed);
+    player2.walkTime += 0.2;
+
+    if (keys['Enter'] && player2.y === 0) {
+        player2.vy = jumpForce;
+    }
+
+    player2.y += player2.vy;
+    player2.vy -= gravity;
+    if (player2.y < 0) {
+        player2.y = 0;
+        player2.vy = 0;
+    }
+
+    // Bounds (Lateral only)
     player1.x = Math.max(-4.5, Math.min(4.5, player1.x));
-    player1.z = Math.max(-75, Math.min(-2, player1.z));
     player2.x = Math.max(-4.5, Math.min(4.5, player2.x));
-    player2.z = Math.max(-75, Math.min(-2, player2.z));
-});
+}
+
+// ============== GERAR CENÁRIO DINÂMICO ==================
+function generateScene(refZ) {
+    vertices = [];
+    colors = [];
+    normals = [];
+
+    // Gerar chão/teto/paredes em torno do jogador de forma contínua
+    // Usamos refZ diretamente para que o chão se mova suavemente com o jogador
+    const viewDist = 150;
+    const backDist = 20;
+    const startZ = refZ + backDist;
+    const endZ = refZ - viewDist;
+
+    // Piso
+    quad([-5,0,startZ],[5,0,startZ],[5,0,endZ],[-5,0,endZ],[0.82,0.82,0.75]);
+    // Teto
+    quad([-5,6,startZ],[5,6,startZ],[5,6,endZ],[-5,6,endZ],[0.9,0.88,0.85]);
+    // Paredes
+    quad([-5,0,startZ],[-5,6,startZ],[-5,6,endZ],[-5,0,endZ],[0.95,0.9,0.85]);
+    quad([5,0,startZ],[5,6,startZ],[5,6,endZ],[5,0,endZ],[0.95,0.9,0.85]);
+
+    // Mesas (Obstáculos)
+    // Alinhar obstáculos a uma grade fixa no mundo para evitar que eles "deslizem" ou pulem
+    const spacing = 8;
+    // Encontrar o primeiro índice de obstáculo dentro do alcance visível
+    // Queremos z = i * spacing tal que z <= startZ
+    let firstIndex = Math.floor(startZ / spacing);
+    
+    for (let i = firstIndex; i * spacing > endZ; i--) {
+        let z = i * spacing;
+        // Usar o índice como semente para garantir que o obstáculo seja sempre o mesmo naquela posição
+        const seed = Math.abs(i);
+        const pattern = seed % 3; 
+        
+        if (pattern === 0) {
+            addTable(-2, z);
+        } else if (pattern === 1) {
+            addTable(2, z);
+        } else {
+            addTable(-2, z);
+            addTable(2, z);
+        }
+    }
+}
 
 // ============== ATUALIZAR GEOMETRIA ==================
 function updateCharacters() {
-    vertices.length = sceneVertexCount;
-    colors.length = sceneVertexCount;
-    normals.length = sceneVertexCount;
-    
-    addCharacter(player1.x, player1.z, [0.9, 0.7, 0.6], [0.0, 0.6, 0.7], [0.2, 0.2, 0.7], [0.25, 0.15, 0.1], [0.2, 0.2, 0.8]);
-    addCharacter(player2.x, player2.z, [0.95, 0.8, 0.7], [0.8, 0.1, 0.1], [0.3, 0.3, 0.3], [0.9, 0.8, 0.2], [0.0, 0.6, 0.0]);
+    // Regenerar cenário baseado na posição do Player 1 (assumindo que estão próximos)
+    generateScene(player1.z);
+
+    addCharacter(player1.x, player1.z, [0.9, 0.7, 0.6], [0.0, 0.6, 0.7], [0.2, 0.2, 0.7], [0.25, 0.15, 0.1], [0.2, 0.2, 0.8], player1.rotation, player1.walkTime, player1.y);
+    addCharacter(player2.x, player2.z, [0.95, 0.8, 0.7], [0.8, 0.1, 0.1], [0.3, 0.3, 0.3], [0.9, 0.8, 0.2], [0.0, 0.6, 0.0], player2.rotation, player2.walkTime, player2.y);
     
     const vertexData = new Float32Array(vertices);
     const colorData = new Float32Array(colors);
@@ -351,6 +492,7 @@ function renderView(gl, program, canvas, playerPos) {
 
 // ============== LOOP ==================
 function draw() {
+    updatePhysics();
     updateCharacters();
     renderView(gl1, program1, canvas1, player1);
     renderView(gl2, program2, canvas2, player2);

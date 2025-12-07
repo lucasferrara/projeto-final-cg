@@ -229,7 +229,7 @@ function addRotatedCube(x, y, z, w, h, d, color, rotation) {
 }
 
 function addTable(x,z){
-    const tableColor = [0.7,0.4,0.2];
+    const tableColor = [1.0, 1.0, 1.0];
     const legColor = [0.4,0.25,0.15];
     addCube(x, 0.85, z, 0.7, 0.1, 0.7, tableColor);
     const h = 0.8, s = 0.05;
@@ -237,6 +237,20 @@ function addTable(x,z){
     addCube(x+0.55, h/2, z-0.55, s, h/2, s, legColor);
     addCube(x-0.55, h/2, z+0.55, s, h/2, s, legColor);
     addCube(x+0.55, h/2, z+0.55, s, h/2, s, legColor);
+}
+
+function addChair(x, z) {
+    const chairColor = [0.1, 0.1, 0.1];
+    // Seat
+    addCube(x, 0.5, z, 0.3, 0.05, 0.3, chairColor);
+    // Back
+    addCube(x, 0.9, z - 0.25, 0.3, 0.35, 0.05, chairColor);
+    // Legs
+    const h = 0.45, s = 0.04;
+    addCube(x - 0.25, h/2, z - 0.25, s, h/2, s, chairColor);
+    addCube(x + 0.25, h/2, z - 0.25, s, h/2, s, chairColor);
+    addCube(x - 0.25, h/2, z + 0.25, s, h/2, s, chairColor);
+    addCube(x + 0.25, h/2, z + 0.25, s, h/2, s, chairColor);
 }
 
 // Distribuição de mesas
@@ -353,25 +367,28 @@ function checkCollision(p) {
     const spacing = 8;
     // Find the closest table index
     const i = Math.round(p.z / spacing);
-    const tableZ = i * spacing;
+    const obstacleZ = i * spacing;
+    const seed = Math.abs(i);
+    const isChair = (seed % 2 !== 0);
     
-    // Check Z distance (Player depth ~0.4, Table depth 1.4)
-    // Threshold: (0.2 + 0.7) = 0.9
-    if (Math.abs(p.z - tableZ) < 0.9) {
-        // Check if table exists at this index
-        const seed = Math.abs(i);
+    // Dimensions
+    // Table: w=0.7, d=0.7 -> bounds +/- 0.7
+    // Chair: w=0.3, d=0.3 -> bounds +/- 0.3
+    const obsSize = isChair ? 0.3 : 0.7;
+    const thresholdZ = obsSize + 0.2; // + player depth
+    const thresholdX = obsSize + 0.4; // + player width + margin
+
+    // Check Z distance
+    if (Math.abs(p.z - obstacleZ) < thresholdZ) {
         const pattern = seed % 3;
         let hit = false;
         
-        // Check X distance (Player width ~0.8, Table width 1.4)
-        // Threshold: (0.4 + 0.7) = 1.1
-        
-        // Table at -2
-        if ((pattern === 0 || pattern === 2) && Math.abs(p.x - (-2)) < 1.1) {
+        // Table/Chair at -2
+        if ((pattern === 0 || pattern === 2) && Math.abs(p.x - (-2)) < thresholdX) {
             hit = true;
         }
-        // Table at 2
-        if ((pattern === 1 || pattern === 2) && Math.abs(p.x - 2) < 1.1) {
+        // Table/Chair at 2
+        if ((pattern === 1 || pattern === 2) && Math.abs(p.x - 2) < thresholdX) {
             hit = true;
         }
         
@@ -490,14 +507,20 @@ function generateScene(minZ, maxZ) {
         let z = i * spacing;
         const seed = Math.abs(i);
         const pattern = seed % 3; 
+        const isChair = (seed % 2 !== 0);
+        
+        const drawObs = (ox, oz) => {
+            if (isChair) addChair(ox, oz);
+            else addTable(ox, oz);
+        };
         
         if (pattern === 0) {
-            addTable(-2, z);
+            drawObs(-2, z);
         } else if (pattern === 1) {
-            addTable(2, z);
+            drawObs(2, z);
         } else {
-            addTable(-2, z);
-            addTable(2, z);
+            drawObs(-2, z);
+            drawObs(2, z);
         }
     }
 }

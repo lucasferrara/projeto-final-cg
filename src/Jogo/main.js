@@ -1,4 +1,3 @@
-// ================== SETUP ====================
 const canvas1 = document.getElementById("canvas1");
 const canvas2 = document.getElementById("canvas2");
 const gl1 = canvas1.getContext("webgl");
@@ -17,7 +16,7 @@ window.onresize = resize;
 
 if (!gl1 || !gl2) alert("WebGL não suportado");
 
-// =============== SHADERS (ILUMINAÇÃO SIMPLES) =====================
+// =============== SHADERS (ORIGINAL - 1 LUZ) =====================
 const vsSrc = `
 attribute vec3 position;
 attribute vec3 color;
@@ -111,12 +110,13 @@ function updatePhysics() {
     const autoSpeed = 0.15;
     const gravity = 0.01;
     const jumpForce = 0.2;
-    const BONUS_VALUE = 50;
+    const BONUS_VALUE = 50; // Valor do Bilhete (500 pts)
 
     // --- JOGADOR 1 ---
     if (!checkCollision(player1)) player1.z -= autoSpeed;
     else penalties1 += 1;
 
+    // Se pegar o bilhete, reduz penalidade (ganha ponto)
     if (checkBonusCollision(player1)) penalties1 -= (BONUS_VALUE * 10);
 
     let dx1 = 0;
@@ -148,11 +148,13 @@ function updatePhysics() {
     player1.x = Math.max(-2.5, Math.min(2.5, player1.x));
     player2.x = Math.max(-2.5, Math.min(2.5, player2.x));
 
+    // SCORE
     score1 = Math.max(0, Math.floor(-player1.z) - Math.floor(penalties1 / 10));
     score2 = Math.max(0, Math.floor(-player2.z) - Math.floor(penalties2 / 10));
     document.getElementById('score1').innerText = "P1: " + score1;
     document.getElementById('score2').innerText = "P2: " + score2;
 
+    // VITORIA AOS 500
     if (score1 >= WIN_SCORE || score2 >= WIN_SCORE) {
         isGameOver = true;
         const winner = (score1 >= WIN_SCORE) ? "Jogador 1" : "Jogador 2";
@@ -176,18 +178,20 @@ function generateScene(minZ, maxZ) {
     
     for (let i = firstIndex; i * spacing > endZ; i--) {
         let z = i * spacing;
-        if (z > -30) continue;
+        
+        // Mantido -30 para ficar "como no início" (sem nascer na cara do player)
+        if (z > -30) continue; 
 
         const rowObstacles = getRowInfo(i);
         rowObstacles.forEach(obs => {
             if (obs.type === 'chair') addChair(obs.x, z);
             else if (obs.type === 'table') addTable(obs.x, z);
-            else if (obs.type === 'bonus') addRU(obs.x, z); // DESENHA O RU
+            else if (obs.type === 'bonus') addRU(obs.x, z); // DESENHA O BILHETE
         });
     }
 }
 
-// ============== ATUALIZAR E RENDERIZAR ==================
+// ============== RENDERIZAR ==================
 function updateCharacters() {
     const minZ = Math.min(player1.z, player2.z);
     const maxZ = Math.max(player1.z, player2.z);

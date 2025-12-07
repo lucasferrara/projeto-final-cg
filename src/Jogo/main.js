@@ -89,12 +89,10 @@ let buffers2 = setupBuffers(gl2, program2);
 // ============== ESTADO DO JOGO ==================
 let player1 = { x: -1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
 let player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
-let score1 = 0;
-let score2 = 0;
-let penalties1 = 0;
-let penalties2 = 0;
+let score1 = 0; let score2 = 0;
+let penalties1 = 0; let penalties2 = 0;
 let isGameOver = false;
-const WIN_SCORE = 500; // Meta de pontos
+const WIN_SCORE = 500; 
 
 function updatePhysics() {
     if (isGameOver) {
@@ -102,60 +100,50 @@ function updatePhysics() {
             resetGameSeed();
             player1 = { x: -1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
             player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
-            penalties1 = 0; penalties2 = 0;
-            score1 = 0; score2 = 0;
+            score1 = 0; score2 = 0; penalties1 = 0; penalties2 = 0;
             isGameOver = false;
             document.getElementById('game-over').style.display = 'none';
         }
         return;
     }
-    
-    const speed = 0.1;
-    const autoSpeed = 0.15;
-    const jumpForce = 0.2;
-    const gravity = 0.01;
-    const BONUS_VALUE = 50;
 
-    // --- PLAYER 1 ---
-    if (!checkCollision(player1)) {
-        player1.z -= autoSpeed;
-    } else {
-        penalties1 += 1; 
-    }
-    if (checkBonusCollision(player1)) {
-        penalties1 -= (BONUS_VALUE * 10);
-    }
+    const autoSpeed = 0.15;
+    const gravity = 0.01;
+    const jumpForce = 0.2;
     
+    // === CONFIGURAÇÃO DOS PONTOS ===
+    // Agora o Bilhete vale 20 pontos
+    const BONUS_VALUE = 20; 
+
+    // --- JOGADOR 1 ---
+    if (!checkCollision(player1)) player1.z -= autoSpeed;
+    else penalties1 += 1;
+
+    // Reduz penalidade (Bonus * 10) para somar no score final
+    if (checkBonusCollision(player1)) penalties1 -= (BONUS_VALUE * 10);
+
     let dx1 = 0;
-    if (keys['a'] || keys['A']) { dx1 -= speed; }
-    if (keys['d'] || keys['D']) { dx1 += speed; }
-    
+    if (keys['a'] || keys['A']) dx1 -= 0.1;
+    if (keys['d'] || keys['D']) dx1 += 0.1;
     player1.x += dx1;
     player1.rotation = Math.atan2(dx1, autoSpeed);
     player1.walkTime += 0.2;
-
     if ((keys['w'] || keys['W']) && player1.y === 0) player1.vy = jumpForce;
     player1.y += player1.vy; player1.vy -= gravity;
     if (player1.y < 0) { player1.y = 0; player1.vy = 0; }
 
-    // --- PLAYER 2 ---
-    if (!checkCollision(player2)) {
-        player2.z -= autoSpeed;
-    } else {
-        penalties2 += 1;
-    }
-    if (checkBonusCollision(player2)) {
-        penalties2 -= (BONUS_VALUE * 10);
-    }
+    // --- JOGADOR 2 ---
+    if (!checkCollision(player2)) player2.z -= autoSpeed;
+    else penalties2 += 1;
+
+    if (checkBonusCollision(player2)) penalties2 -= (BONUS_VALUE * 10);
 
     let dx2 = 0;
-    if (keys['ArrowLeft']) { dx2 -= speed; }
-    if (keys['ArrowRight']) { dx2 += speed; }
-
+    if (keys['ArrowLeft']) dx2 -= 0.1;
+    if (keys['ArrowRight']) dx2 += 0.1;
     player2.x += dx2;
     player2.rotation = Math.atan2(dx2, autoSpeed);
     player2.walkTime += 0.2;
-
     if (keys['ArrowUp'] && player2.y === 0) player2.vy = jumpForce;
     player2.y += player2.vy; player2.vy -= gravity;
     if (player2.y < 0) { player2.y = 0; player2.vy = 0; }
@@ -164,7 +152,7 @@ function updatePhysics() {
     player1.x = Math.max(-2.5, Math.min(2.5, player1.x));
     player2.x = Math.max(-2.5, Math.min(2.5, player2.x));
 
-    // Score e Vitória
+    // Score
     score1 = Math.max(0, Math.floor(-player1.z) - Math.floor(penalties1 / 10));
     score2 = Math.max(0, Math.floor(-player2.z) - Math.floor(penalties2 / 10));
     document.getElementById('score1').innerText = "P1: " + score1;
@@ -182,20 +170,15 @@ function updatePhysics() {
 // ============== GERAR CENÁRIO ==================
 function generateScene(minZ, maxZ) {
     resetGeometry();
-    const viewDist = 150;
+    
+    // Distância de visão otimizada para performance
+    const viewDist = 90; 
+    
     const startZ = maxZ + 20;
     const endZ = minZ - viewDist;
 
-    // Cenário estático
-    quad([-3.0,0,startZ],[3.0,0,startZ],[3.0,0,endZ],[-3.0,0,endZ],[0.82,0.82,0.75]);
-    quad([-3.0,6,startZ],[3.0,6,startZ],[3.0,6,endZ],[-3.0,6,endZ],[0.9,0.88,0.85]);
-    quad([-3.0,0,startZ],[-3.0,6,startZ],[-3.0,6,endZ],[-3.0,0,endZ],[0.95,0.9,0.85]);
-    quad([3.0,0,startZ],[3.0,6,startZ],[3.0,6,endZ],[3.0,0,endZ],[0.95,0.9,0.85]);
-    if (0 <= startZ && 0 >= endZ) {
-        quad([-3.0, 0.01, 0.5], [3.0, 0.01, 0.5], [3.0, 0.01, -0.5], [-3.0, 0.01, -0.5], [1, 1, 1]);
-    }
+    addCorridor(startZ, endZ);
 
-    // Objetos Dinâmicos (Chama o Collision.js)
     const spacing = 8;
     let firstIndex = Math.floor(startZ / spacing);
     

@@ -1,75 +1,99 @@
-// ARQUIVO: src/Jogo/Collision.js
+let gameSeed = Math.random() * 1000;
+const collectedBonuses = new Set(); // Guarda quais bilhetes já foram pegos
 
-const worldMap = new Map();
-const collectedBonuses = new Set(); 
+function pseudoRandom(seed) {
+    let x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
 
-function getRowInfo(rowIndex) {
-    if (worldMap.has(rowIndex)) return worldMap.get(rowIndex);
+// Função que decide o que aparece em cada linha
+function getRowInfo(index) {
+    const effectiveSeed = index + gameSeed;
+    const rnd = pseudoRandom(effectiveSeed);
+    const typeRnd = pseudoRandom(effectiveSeed + 123.45);
+    
+    // --- LÓGICA DE BÔNUS (RU) ---
+    // Chance rara (5%) de aparecer um bônus.
+    const bonusRnd = pseudoRandom(effectiveSeed + 999);
+    
+    if (bonusRnd < 0.05) { // 5% de chance
+        const lanes = [-2, 0, 2];
+        const laneIdx = Math.floor(pseudoRandom(effectiveSeed + 888) * 3);
+        const bonusX = lanes[laneIdx];
+        const id = `${index}_${bonusX}`;
 
-    const items = [];
-    // Aleatoriedade simples original
-    const rand = Math.sin(rowIndex * 999); 
-
-    // 1. OBSTÁCULOS (Mesas/Cadeiras) - Frequente (> 0.6)
-    if (rand > 0.6) {
-        const type = (rand > 0.8) ? 'table' : 'chair';
-        const posX = (Math.floor((rand * 100) % 3) - 1) * 1.5; 
-        items.push({ type: type, x: posX });
-    } 
-    // 2. BÔNUS (Bilhete RU) - Raro (< -0.9)
-    else if (rand < -0.9) {
-        const posX = (Math.floor((rand * 100) % 3) - 1) * 1.5;
-        const id = `${rowIndex}_${posX}`;
-        
-        // Só cria se não foi pego ainda
+        // Se ainda não pegou, retorna o bônus
         if (!collectedBonuses.has(id)) {
-            items.push({ type: 'bonus', x: posX, id: id });
+            return [{ x: bonusX, type: 'bonus', id: id }];
         }
     }
 
-    worldMap.set(rowIndex, items);
-    return items;
+    // --- LÓGICA DE OBSTÁCULOS (Mesa/Cadeira) ---
+    // Mantendo a lógica original do seu projeto
+    const obstacles = [];
+    const positions = [];
+    
+    // Distribuição das posições (Esquerda, Direita, Centro ou Combinações)
+    if (rnd < 0.20) positions.push(-2);
+    else if (rnd < 0.40) positions.push(2);
+    else if (rnd < 0.55) positions.push(0);
+    else if (rnd < 0.70) positions.push(-2, 2);
+    else if (rnd < 0.85) positions.push(-2, 0);
+    else positions.push(0, 2);
+    
+    positions.forEach((x, i) => {
+        const tVal = pseudoRandom(typeRnd + i);
+        obstacles.push({ x, type: tVal > 0.5 ? 'chair' : 'table' });
+    });
+    return obstacles;
 }
 
-function checkCollision(player) {
-    const playerZIndex = Math.floor(player.z / 8);
-    for (let i = playerZIndex - 1; i <= playerZIndex + 1; i++) {
-        const items = getRowInfo(i);
-        const itemZ = i * 8;
-        for (const item of items) {
-            if (item.type === 'bonus') continue; // Atravessa o bilhete
-            
-            const dx = Math.abs(player.x - item.x);
-            const dz = Math.abs(player.z - itemZ);
-            
-            if (dx < 0.7 && dz < 0.7) {
-                // Pular Cadeira
-                if (item.type === 'chair' && player.y > 0.6) return false;
-                // Mesa é sólida
-                return true; 
+// Verifica colisão com obstáculos físicos
+function checkCollision(p) {
+    if (p.y > 1.0) return false; // Se pular alto, não bate
+
+    const spacing = 8;
+    const i = Math.round(p.z / spacing);
+    const obstacleZ = i * spacing;
+    
+    // Zona Segura no início
+    if (obstacleZ > -30) return false;
+    
+    const rowObstacles = getRowInfo(i);
+    
+    for (const obs of rowObstacles) {
+        if (obs.type === 'bonus') continue; // Bônus não tem colisão física
+
+        const isChair = obs.type === 'chair';
+        const obsSize = isChair ? 0.4 : 0.9;
+        const thresholdZ = obsSize + 0.15; 
+        const thresholdX = obsSize + 0.3;
+
+        if (Math.abs(p.z - obstacleZ) < thresholdZ) {
+            if (Math.abs(p.x - obs.x) < thresholdX) {
+                return true;
             }
         }
     }
     return false;
 }
 
-function checkBonusCollision(player) {
-    const playerZIndex = Math.floor(player.z / 8);
-    for (let i = playerZIndex - 1; i <= playerZIndex + 1; i++) {
-        const items = getRowInfo(i);
-        const itemZ = i * 8;
-        for (let k = 0; k < items.length; k++) {
-            const item = items[k];
-            if (item.type !== 'bonus') continue;
+// Verifica colisão com o Bilhete do RU
+function checkBonusCollision(p) {
+    const spacing = 8;
+    const i = Math.round(p.z / spacing);
+    const obstacleZ = i * spacing;
+    
+    const rowObstacles = getRowInfo(i);
 
-            const dx = Math.abs(player.x - item.x);
-            const dz = Math.abs(player.z - itemZ);
-            
-            // Área de coleta
-            if (dx < 0.8 && dz < 0.8 && player.y < 1.0) {
-                collectedBonuses.add(item.id);
-                items.splice(k, 1); 
-                return true; 
+    for (const obs of rowObstacles) {
+        if (obs.type !== 'bonus') continue;
+
+        // Raio de coleta do bônus
+        if (Math.abs(p.z - obstacleZ) < 0.8) {
+            if (Math.abs(p.x - obs.x) < 0.8) {
+                collectedBonuses.add(obs.id); // Marca como pego
+                return true;
             }
         }
     }
@@ -77,6 +101,6 @@ function checkBonusCollision(player) {
 }
 
 function resetGameSeed() {
-    worldMap.clear();
+    gameSeed = Math.random() * 1000;
     collectedBonuses.clear();
 }

@@ -1,3 +1,5 @@
+// ARQUIVO: src/Jogo/Collision.js
+
 const worldMap = new Map();
 const collectedBonuses = new Set(); 
 
@@ -5,21 +7,21 @@ function getRowInfo(rowIndex) {
     if (worldMap.has(rowIndex)) return worldMap.get(rowIndex);
 
     const items = [];
+    // Aleatoriedade simples original
     const rand = Math.sin(rowIndex * 999); 
 
-    // 1. OBSTÁCULOS (Mesas/Cadeiras) - Frequência Normal
+    // 1. OBSTÁCULOS (Mesas/Cadeiras) - Frequente (> 0.6)
     if (rand > 0.6) {
         const type = (rand > 0.8) ? 'table' : 'chair';
         const posX = (Math.floor((rand * 100) % 3) - 1) * 1.5; 
         items.push({ type: type, x: posX });
     } 
-    // 2. BÔNUS (Bilhete RU) - FREQUÊNCIA ALTA
-    // Mudei de -0.9 para -0.5. 
-    // Isso significa que aparecerá muito mais vezes (quase 25% de chance).
-    else if (rand < -0.5) {
+    // 2. BÔNUS (Bilhete RU) - Raro (< -0.9)
+    else if (rand < -0.9) {
         const posX = (Math.floor((rand * 100) % 3) - 1) * 1.5;
         const id = `${rowIndex}_${posX}`;
         
+        // Só cria se não foi pego ainda
         if (!collectedBonuses.has(id)) {
             items.push({ type: 'bonus', x: posX, id: id });
         }
@@ -35,13 +37,15 @@ function checkCollision(player) {
         const items = getRowInfo(i);
         const itemZ = i * 8;
         for (const item of items) {
-            if (item.type === 'bonus') continue; 
+            if (item.type === 'bonus') continue; // Atravessa o bilhete
             
             const dx = Math.abs(player.x - item.x);
             const dz = Math.abs(player.z - itemZ);
             
             if (dx < 0.7 && dz < 0.7) {
+                // Pular Cadeira
                 if (item.type === 'chair' && player.y > 0.6) return false;
+                // Mesa é sólida
                 return true; 
             }
         }
@@ -61,6 +65,7 @@ function checkBonusCollision(player) {
             const dx = Math.abs(player.x - item.x);
             const dz = Math.abs(player.z - itemZ);
             
+            // Área de coleta
             if (dx < 0.8 && dz < 0.8 && player.y < 1.0) {
                 collectedBonuses.add(item.id);
                 items.splice(k, 1); 

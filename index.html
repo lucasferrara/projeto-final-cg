@@ -55,16 +55,16 @@
         <div class="player-view">
             <div class="info">
                 <h3>Jogador 1</h3>
-                <p>WASD: Mover</p>
-                <p>Espaço: Pular</p>
+                <p>A/D: Mover</p>
+                <p>W: Pular</p>
             </div>
             <canvas id="canvas1"></canvas>
         </div>
         <div class="player-view">
             <div class="info">
                 <h3>Jogador 2</h3>
-                <p>Setas: Mover</p>
-                <p>Enter: Pular</p>
+                <p>Setas Esq/Dir: Mover</p>
+                <p>Seta Cima: Pular</p>
             </div>
             <canvas id="canvas2"></canvas>
         </div>
@@ -264,14 +264,22 @@ const sceneVertexCount = vertices.length;
 
 // ============ PERSONAGENS =============
 function addCharacter(px, pz, skinColor, shirtColor, pantsColor, hairColor, eyeColor, rotation = 0, walkTime = 0, py = 0) {
+    const scale = 0.7;
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
 
     function drawPart(rx, ry, rz, w, h, d, col) {
-        const worldX = px + (rx * cos - rz * sin);
-        const worldZ = pz + (rx * sin + rz * cos);
-        const worldY = py + ry;
-        addRotatedCube(worldX, worldY, worldZ, w, h, d, col, rotation);
+        const sRx = rx * scale;
+        const sRy = ry * scale;
+        const sRz = rz * scale;
+        const sW = w * scale;
+        const sH = h * scale;
+        const sD = d * scale;
+
+        const worldX = px + (sRx * cos - sRz * sin);
+        const worldZ = pz + (sRx * sin + sRz * cos);
+        const worldY = py + sRy;
+        addRotatedCube(worldX, worldY, worldZ, sW, sH, sD, col, rotation);
     }
 
     const legAmp = 0.2;
@@ -375,8 +383,8 @@ function checkCollision(p) {
     // Table: w=0.7, d=0.7 -> bounds +/- 0.7
     // Chair: w=0.3, d=0.3 -> bounds +/- 0.3
     const obsSize = isChair ? 0.3 : 0.7;
-    const thresholdZ = obsSize + 0.2; // + player depth
-    const thresholdX = obsSize + 0.4; // + player width + margin
+    const thresholdZ = obsSize + 0.15; // + player depth (scaled)
+    const thresholdX = obsSize + 0.3; // + player width (scaled) + margin
 
     // Check Z distance
     if (Math.abs(p.z - obstacleZ) < thresholdZ) {
@@ -430,7 +438,7 @@ function updatePhysics() {
     player1.rotation = Math.atan2(dx1, -autoSpeed);
     player1.walkTime += 0.2;
 
-    if (keys[' '] && player1.y === 0) {
+    if ((keys['w'] || keys['W']) && player1.y === 0) {
         player1.vy = jumpForce;
     }
     
@@ -457,7 +465,7 @@ function updatePhysics() {
     player2.rotation = Math.atan2(dx2, -autoSpeed);
     player2.walkTime += 0.2;
 
-    if (keys['Enter'] && player2.y === 0) {
+    if (keys['ArrowUp'] && player2.y === 0) {
         player2.vy = jumpForce;
     }
 

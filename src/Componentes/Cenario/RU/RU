@@ -1,7 +1,7 @@
 function RU(x, z) {
     const corPapel = [0.95, 0.95, 0.9];
-    const corTexto = [0.1, 0.1, 0.1];
     const time = Date.now() * 0.003; 
     const y = 1.0 + Math.sin(time * 2) * 0.1; 
+
     addRotatedCube(x, y, z, 0.2, 0.3, 0.02, corPapel, time);
 }

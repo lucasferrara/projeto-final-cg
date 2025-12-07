@@ -70,6 +70,17 @@
         </div>
     </div>
 
+    <div id="ui-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="display: flex; justify-content: space-around; padding: 20px; font-size: 24px; color: white; font-weight: bold; text-shadow: 2px 2px 0 #000;">
+            <div id="score1">P1: 0</div>
+            <div id="score2">P2: 0</div>
+        </div>
+        <div id="game-over" style="display: none; justify-content: center; align-items: center; height: 100%; background: rgba(0,0,0,0.8); color: white; font-size: 48px; flex-direction: column; pointer-events: auto;">
+            <div>GAME OVER</div>
+            <div style="font-size: 24px; margin-top: 20px;">Pressione R para reiniciar</div>
+        </div>
+    </div>
+
     <script src="Personagens/m4.js"></script>
     <script>
 // ================== SETUP ====================
@@ -330,7 +341,55 @@ const keys = {};
 window.addEventListener('keydown', e => keys[e.key] = true);
 window.addEventListener('keyup', e => keys[e.key] = false);
 
+let score1 = 0;
+let score2 = 0;
+let penalties1 = 0;
+let penalties2 = 0;
+
+function checkCollision(p) {
+    // If player is high enough, no collision
+    if (p.y > 1.0) return false;
+
+    const spacing = 8;
+    // Find the closest table index
+    const i = Math.round(p.z / spacing);
+    const tableZ = i * spacing;
+    
+    // Check Z distance (Player depth ~0.4, Table depth 1.4)
+    // Threshold: (0.2 + 0.7) = 0.9
+    if (Math.abs(p.z - tableZ) < 0.9) {
+        // Check if table exists at this index
+        const seed = Math.abs(i);
+        const pattern = seed % 3;
+        let hit = false;
+        
+        // Check X distance (Player width ~0.8, Table width 1.4)
+        // Threshold: (0.4 + 0.7) = 1.1
+        
+        // Table at -2
+        if ((pattern === 0 || pattern === 2) && Math.abs(p.x - (-2)) < 1.1) {
+            hit = true;
+        }
+        // Table at 2
+        if ((pattern === 1 || pattern === 2) && Math.abs(p.x - 2) < 1.1) {
+            hit = true;
+        }
+        
+        if (hit) return true;
+    }
+    return false;
+}
+
 function updatePhysics() {
+    if (keys['r'] || keys['R']) {
+        // Reset game
+        player1 = { x: -1, y: 0, z: -5, vy: 0, rotation: Math.PI, walkTime: 0 };
+        player2 = { x: 1, y: 0, z: -5, vy: 0, rotation: Math.PI, walkTime: 0 };
+        penalties1 = 0;
+        penalties2 = 0;
+        document.getElementById('game-over').style.display = 'none';
+    }
+
     const speed = 0.1;
     const autoSpeed = 0.15;
     const jumpForce = 0.2;
@@ -338,16 +397,19 @@ function updatePhysics() {
 
     // Player 1
     let dx1 = 0;
-    // Auto-run
-    player1.z -= autoSpeed;
+    
+    // Check collision before moving Z
+    if (!checkCollision(player1)) {
+        player1.z -= autoSpeed;
+    } else {
+        penalties1 += 1; // Lose points continuously while stuck
+    }
     
     if (keys['a'] || keys['A']) { dx1 -= speed; }
     if (keys['d'] || keys['D']) { dx1 += speed; }
     
     player1.x += dx1;
     // Rotation based on lateral movement + forward movement
-    // Forward is -Z. If moving left (-X), angle is slightly left.
-    // atan2(dx, dz): dz is always -autoSpeed
     player1.rotation = Math.atan2(dx1, -autoSpeed);
     player1.walkTime += 0.2;
 
@@ -364,8 +426,12 @@ function updatePhysics() {
 
     // Player 2
     let dx2 = 0;
-    // Auto-run
-    player2.z -= autoSpeed;
+    
+    if (!checkCollision(player2)) {
+        player2.z -= autoSpeed;
+    } else {
+        penalties2 += 1;
+    }
 
     if (keys['ArrowLeft']) { dx2 -= speed; }
     if (keys['ArrowRight']) { dx2 += speed; }
@@ -388,20 +454,25 @@ function updatePhysics() {
     // Bounds (Lateral only)
     player1.x = Math.max(-4.5, Math.min(4.5, player1.x));
     player2.x = Math.max(-4.5, Math.min(4.5, player2.x));
+
+    // Update Scores
+    score1 = Math.floor(-player1.z) - Math.floor(penalties1 / 10);
+    score2 = Math.floor(-player2.z) - Math.floor(penalties2 / 10);
+    document.getElementById('score1').innerText = "P1: " + score1;
+    document.getElementById('score2').innerText = "P2: " + score2;
 }
 
 // ============== GERAR CENÁRIO DINÂMICO ==================
-function generateScene(refZ) {
+function generateScene(minZ, maxZ) {
     vertices = [];
     colors = [];
     normals = [];
 
-    // Gerar chão/teto/paredes em torno do jogador de forma contínua
-    // Usamos refZ diretamente para que o chão se mova suavemente com o jogador
+    // Gerar chão/teto/paredes cobrindo a área de ambos os jogadores
     const viewDist = 150;
     const backDist = 20;
-    const startZ = refZ + backDist;
-    const endZ = refZ - viewDist;
+    const startZ = maxZ + backDist;
+    const endZ = minZ - viewDist;
 
     // Piso
     quad([-5,0,startZ],[5,0,startZ],[5,0,endZ],[-5,0,endZ],[0.82,0.82,0.75]);
@@ -412,15 +483,11 @@ function generateScene(refZ) {
     quad([5,0,startZ],[5,6,startZ],[5,6,endZ],[5,0,endZ],[0.95,0.9,0.85]);
 
     // Mesas (Obstáculos)
-    // Alinhar obstáculos a uma grade fixa no mundo para evitar que eles "deslizem" ou pulem
     const spacing = 8;
-    // Encontrar o primeiro índice de obstáculo dentro do alcance visível
-    // Queremos z = i * spacing tal que z <= startZ
     let firstIndex = Math.floor(startZ / spacing);
     
     for (let i = firstIndex; i * spacing > endZ; i--) {
         let z = i * spacing;
-        // Usar o índice como semente para garantir que o obstáculo seja sempre o mesmo naquela posição
         const seed = Math.abs(i);
         const pattern = seed % 3; 
         
@@ -437,8 +504,10 @@ function generateScene(refZ) {
 
 // ============== ATUALIZAR GEOMETRIA ==================
 function updateCharacters() {
-    // Regenerar cenário baseado na posição do Player 1 (assumindo que estão próximos)
-    generateScene(player1.z);
+    // Regenerar cenário baseado na posição de ambos os jogadores
+    const minZ = Math.min(player1.z, player2.z);
+    const maxZ = Math.max(player1.z, player2.z);
+    generateScene(minZ, maxZ);
 
     addCharacter(player1.x, player1.z, [0.9, 0.7, 0.6], [0.0, 0.6, 0.7], [0.2, 0.2, 0.7], [0.25, 0.15, 0.1], [0.2, 0.2, 0.8], player1.rotation, player1.walkTime, player1.y);
     addCharacter(player2.x, player2.z, [0.95, 0.8, 0.7], [0.8, 0.1, 0.1], [0.3, 0.3, 0.3], [0.9, 0.8, 0.2], [0.0, 0.6, 0.0], player2.rotation, player2.walkTime, player2.y);

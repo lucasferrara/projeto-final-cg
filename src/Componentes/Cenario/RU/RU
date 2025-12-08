@@ -1,7 +1,23 @@
 function RU(x, z) {
-    const corPapel = [0.95, 0.95, 0.9];
-    const time = Date.now() * 0.003; 
-    const y = 1.0 + Math.sin(time * 2) * 0.1; 
-
-    addRotatedCube(x, y, z, 0.2, 0.3, 0.02, corPapel, time);
+    // Geometria do "RU" (Bilhete Branco)
+    const w = 0.4; // largura
+    const h = 0.6; // altura
+    const yBot = 0.5; // altura do chão (flutuando)
+    
+    // Frente (Branco)
+    quad(
+        [x - w, yBot + h, z], 
+        [x + w, yBot + h, z], 
+        [x + w, yBot, z], 
+        [x - w, yBot, z], 
+        [1.0, 1.0, 1.0] 
+    );
+    // Verso (Cinza claro para dar volume)
+    quad(
+        [x - w, yBot, z + 0.05], 
+        [x + w, yBot, z + 0.05], 
+        [x + w, yBot + h, z + 0.05], 
+        [x - w, yBot + h, z + 0.05], 
+        [0.9, 0.9, 0.9] 
+    );
 }

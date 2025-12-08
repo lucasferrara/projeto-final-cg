@@ -107,6 +107,9 @@ let score2 = 0;
 let penalties1 = 0;
 let penalties2 = 0;
 
+// Variável para controlar se o jogo está rodando
+let gameRunning = true;
+
 function updatePhysics() {
     if (keys['r'] || keys['R']) {
         // Reset game
@@ -115,8 +118,19 @@ function updatePhysics() {
         player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
         penalties1 = 0;
         penalties2 = 0;
+        
+        // Resetar estado de vitória
+        gameRunning = true;
+        document.getElementById('winner-msg').innerText = "GAME OVER";
         document.getElementById('game-over').style.display = 'none';
+        
+        // Resetar texto do placar para evitar delay visual
+        document.getElementById('score1').innerText = "P1: 0";
+        document.getElementById('score2').innerText = "P2: 0";
     }
+    
+    // Se o jogo acabou, para a física
+    if (!gameRunning) return;
     
     const speed = 0.1;
     const autoSpeed = 0.15;
@@ -188,6 +202,17 @@ function updatePhysics() {
     score2 = Math.floor(-player2.z) - Math.floor(penalties2 / 10);
     document.getElementById('score1').innerText = "P1: " + score1;
     document.getElementById('score2').innerText = "P2: " + score2;
+
+    // Verifica Vitoria (500 pontos)
+    if (score1 >= 500 || score2 >= 500) {
+        gameRunning = false;
+        let msg = score1 >= 500 ? "JOGADOR 1 VENCEU!" : "JOGADOR 2 VENCEU!";
+        
+        // Atualiza a tela
+        const msgEl = document.getElementById('winner-msg');
+        if (msgEl) msgEl.innerText = msg;
+        document.getElementById('game-over').style.display = 'flex';
+    }
 }
 
 // ============== GERAR CENÁRIO DINÂMICO ==================

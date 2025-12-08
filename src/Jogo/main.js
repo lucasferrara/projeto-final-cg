@@ -106,45 +106,32 @@ const fs2 = compile(fsSrc, gl2.FRAGMENT_SHADER, gl2);
 const program2 = gl2.createProgram();
 gl2.attachShader(program2, vs2); gl2.attachShader(program2, fs2); gl2.linkProgram(program2); gl2.useProgram(program2);
 
-// =============== TEXTURA GERADA VIA CÓDIGO (SEM IMAGEM) =================
-// Isso elimina erro de arquivo não encontrado ou CORS
-function createCheckerTexture(gl) {
+// =============== CARREGAMENTO DE TEXTURA (REAL) =================
+function loadTexture(gl, url) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
-    // Cria um tabuleiro de xadrez 64x64 pixels na memória
-    const width = 64;
-    const height = 64;
-    const data = new Uint8Array(width * height * 4);
-    
-    for (let i = 0; i < width * height; i++) {
-        const x = i % width;
-        const y = Math.floor(i / width);
-        
-        // Padrão Xadrez: se a soma de X e Y for par, cor clara, senão escura
-        // Usamos cinza claro (255) e cinza médio (150)
-        const color = (Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0 ? 255 : 150;
-        
-        data[i * 4] = color;      // R
-        data[i * 4 + 1] = color;  // G
-        data[i * 4 + 2] = color;  // B
-        data[i * 4 + 3] = 255;    // Alpha (Totalmente visível)
-    }
+    // Pixel azul temporário (enquanto carrega)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
 
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    const image = new Image();
+    image.src = url;
+    image.onload = function() {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 
-    // Configuração para repetir e ficar "pixelado" (nítido)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-
+        // CONFIGURAÇÃO PARA REPETIR (GL_REPEAT)
+        // A imagem DEVE ser POT (ex: 512x512)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    };
     return texture;
 }
 
-// Gera a textura direto na memória
-const texture1 = createCheckerTexture(gl1);
-const texture2 = createCheckerTexture(gl2);
+// Carrega "textura.jpg" da raiz do projeto
+const texture1 = loadTexture(gl1, "textura.jpg");
+const texture2 = loadTexture(gl2, "textura.jpg");
 
 // =============== BUFFERS ===============
 function setupBuffers(gl, program) {

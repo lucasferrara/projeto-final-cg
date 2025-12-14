@@ -13,8 +13,7 @@ function getRowInfo(index) {
     const obstacles = [];
     const positions = [];
     
-    // 0.0-0.2: Left(-2), 0.2-0.4: Right(2), 0.4-0.55: Center(0)
-    // 0.55-0.7: L+R, 0.7-0.85: L+C, 0.85-1.0: R+C
+    // Distribuição: Esq(-2), Dir(2), Centro(0)
     if (rnd < 0.20) positions.push(-2);
     else if (rnd < 0.40) positions.push(2);
     else if (rnd < 0.55) positions.push(0);
@@ -29,27 +28,83 @@ function getRowInfo(index) {
     return obstacles;
 }
 
-function checkCollision(p) {
-    if (p.y > 1.0) return false;
+// === 1. Calcula a altura do chão (Assento, Encosto ou Mesa) ===
+function getFloorHeight(x, z) {
+    const spacing = 8;
+    const i = Math.round(z / spacing);
+    const obstacleZ = i * spacing;
 
+    if (obstacleZ > -30) return 0.0;
+
+    const rowObstacles = getRowInfo(i);
+    let maxH = 0.0;
+
+    for (const obs of rowObstacles) {
+        if (obs.type === 'chair') {
+            // --- CADEIRA (Dividida em 2 partes) ---
+            
+            // A. Assento (Altura 0.55)
+            // Colisão generosa no Z (raio 0.6) para cobrir a base
+            if (Math.abs(z - obstacleZ) < 0.6 && Math.abs(x - obs.x) < 0.7) {
+                maxH = Math.max(maxH, 0.55);
+            }
+
+            // B. Encosto (Altura 1.25) [NOVO]
+            // Fica deslocado para trás (Z - 0.25) e é mais fino (raio Z 0.15)
+            let backZ = obstacleZ - 0.25; 
+            if (Math.abs(z - backZ) < 0.15 && Math.abs(x - obs.x) < 0.7) {
+                maxH = Math.max(maxH, 1.25);
+            }
+
+        } else {
+            // --- MESA ---
+            // Altura 0.95
+            if (Math.abs(z - obstacleZ) < 1.0 && Math.abs(x - obs.x) < 1.2) {
+                maxH = Math.max(maxH, 0.95);
+            }
+        }
+    }
+    return maxH;
+}
+
+// === 2. Verifica Colisão de Parede (Bloqueio) ===
+function checkCollision(p) {
     const spacing = 8;
     const i = Math.round(p.z / spacing);
     const obstacleZ = i * spacing;
     
-    // Safe Zone: No obstacles before Z = -30
     if (obstacleZ > -30) return false;
     
     const rowObstacles = getRowInfo(i);
     
     for (const obs of rowObstacles) {
-        const isChair = obs.type === 'chair';
-        const obsSize = isChair ? 0.4 : 0.9;
-        const thresholdZ = obsSize + 0.15; 
-        const thresholdX = obsSize + 0.3;
+        if (obs.type === 'chair') {
+            // --- CADEIRA ---
+            
+            // A. Colisão com o Assento (Só bate se o pé estiver abaixo de 0.55)
+            if (p.y < 0.55 - 0.1) {
+                if (Math.abs(p.z - obstacleZ) < 0.6 && Math.abs(p.x - obs.x) < 0.7) {
+                    return true;
+                }
+            }
 
-        if (Math.abs(p.z - obstacleZ) < thresholdZ) {
-            if (Math.abs(p.x - obs.x) < thresholdX) {
-                return true;
+            // B. Colisão com o Encosto (Só bate se o pé estiver abaixo de 1.25)
+            // Isso impede que você atravesse o encosto ao pular em cima do assento.
+            let backZ = obstacleZ - 0.25;
+            if (p.y < 1.25 - 0.1) {
+                // Usamos 0.15 de raio no Z para dar um pouco de "corpo" ao encosto
+                if (Math.abs(p.z - backZ) < 0.15 && Math.abs(p.x - obs.x) < 0.7) {
+                    return true;
+                }
+            }
+
+        } else {
+            // --- MESA ---
+            // Só bate se estiver abaixo do tampo (0.95)
+            if (p.y < 0.95 - 0.1) {
+                if (Math.abs(p.z - obstacleZ) < 1.0 && Math.abs(p.x - obs.x) < 1.2) {
+                    return true;
+                }
             }
         }
     }

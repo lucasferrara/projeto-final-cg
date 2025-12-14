@@ -64,13 +64,13 @@ function addCube(x,y,z, w,h,d, color) {
         [x-w, y-h, z-d], [x+w, y-h, z-d], [x+w, y+h, z-d], [x-w, y+h, z-d],
         [x-w, y-h, z+d], [x+w, y-h, z+d], [x+w, y+h, z+d], [x-w, y+h, z+d],
     ];
-    // Objetos pequenos (cadeiras/mesas) não usam a textura do chão (false)
-    quad(v[0],v[1],v[2],v[3],color, false);
-    quad(v[1],v[5],v[6],v[2],color, false);
-    quad(v[5],v[4],v[7],v[6],color, false);
-    quad(v[4],v[0],v[3],v[7],color, false);
-    quad(v[3],v[2],v[6],v[7],color, false);
-    quad(v[0],v[4],v[5],v[1],color, false);
+    // A ordem foi alterada (2º e 4º parâmetros trocados) para a normal apontar para fora
+    quad(v[0],v[3],v[2],v[1],color, false); // Trás
+    quad(v[1],v[2],v[6],v[5],color, false); // Direita
+    quad(v[5],v[6],v[7],v[4],color, false); // Frente
+    quad(v[4],v[7],v[3],v[0],color, false); // Esquerda
+    quad(v[3],v[7],v[6],v[2],color, false); // Topo
+    quad(v[0],v[1],v[5],v[4],color, false); // Base
 }
 
 function addRotatedCube(x, y, z, w, h, d, color, rotation) {
@@ -89,10 +89,11 @@ function addRotatedCube(x, y, z, w, h, d, color, rotation) {
     });
     
     const v = tCorners;
-    quad(v[0],v[1],v[2],v[3],color, false);
-    quad(v[1],v[5],v[6],v[2],color, false);
-    quad(v[5],v[4],v[7],v[6],color, false);
-    quad(v[4],v[0],v[3],v[7],color, false);
-    quad(v[3],v[2],v[6],v[7],color, false);
-    quad(v[0],v[4],v[5],v[1],color, false);
+    // Mesma correção aplicada aqui para os personagens reagirem à luz
+    quad(v[0],v[3],v[2],v[1],color, false);
+    quad(v[1],v[2],v[6],v[5],color, false);
+    quad(v[5],v[6],v[7],v[4],color, false);
+    quad(v[4],v[7],v[3],v[0],color, false);
+    quad(v[3],v[7],v[6],v[2],color, false);
+    quad(v[0],v[1],v[5],v[4],color, false);
 }

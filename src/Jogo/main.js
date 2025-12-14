@@ -22,30 +22,91 @@ window.onresize = resize;
 if (!gl1 || !gl2) alert("WebGL não suportado");
 
 // =============== SHADERS =====================
+
 const vsSrc = `
 attribute vec3 position;
 attribute vec3 color;
 attribute vec3 normal;
+
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform vec3 lightDir;
+
 varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vPos;
+
 void main() {
-    vec3 norm = normalize(mat3(model) * normal);
-    float light = max(dot(norm, lightDir), 0.0) * 0.7 + 0.3;
-    vColor = color * light;
-    gl_Position = projection * view * model * vec4(position, 1.0);
+    vColor = color; // Cor base do objeto
+    vNormal = normalize(mat3(model) * normal);
+    vec4 worldPos = model * vec4(position, 1.0);
+    vPos = worldPos.xyz;
+    
+    gl_Position = projection * view * worldPos;
 }
 `;
 
+// src/Jogo/main.js
+
 const fsSrc = `
 precision mediump float;
+
 varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vPos;
+
+uniform vec3 lightDir;
+uniform vec3 uLightPos[3];
+uniform float uNightMode;
+
 void main() {
-    gl_FragColor = vec4(vColor, 1.0);
+    // === EFEITO DE BRILHO (LÂMPADA) ===
+    // Se a cor for muito clara (acima de 0.90), é uma lâmpada.
+    // Ignoramos sombras e desenhamos a cor pura.
+    if (vColor.r > 0.90 && vColor.g > 0.90) {
+        gl_FragColor = vec4(vColor, 1.0);
+        return; 
+    }
+
+    vec3 norm = normalize(vNormal);
+    vec3 finalColor;
+
+    if (uNightMode < 0.5) {
+        // MODO DIA
+        float light = max(dot(norm, lightDir), 0.0) * 0.7 + 0.3;
+        finalColor = vColor * light;
+    } else {
+        // MODO NOITE
+        vec3 spotDir = vec3(0.0, -1.0, 0.0);
+        float cutoff = 0.92; 
+        
+        vec3 accumColor = vec3(0.0);
+        
+        for(int i = 0; i < 3; i++) {
+            vec3 lPos = uLightPos[i];
+            vec3 lDir = normalize(lPos - vPos);
+            float theta = dot(lDir, -spotDir);
+            
+            if(theta > cutoff) {
+                float diff = max(dot(norm, lDir), 0.0);
+                float dist = distance(lPos, vPos);
+                float attenuation = 1.0 / (1.0 + 0.1 * dist + 0.1 * dist * dist);
+                float intensity = smoothstep(cutoff, cutoff + 0.02, theta);
+                
+                accumColor += vColor * diff * attenuation * intensity * 5.0;
+            }
+        }
+        
+        // Luz ambiente para ver as paredes
+        accumColor += vColor * 0.15;
+        
+        finalColor = accumColor;
+    }
+    
+    gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
+
 
 function compile(src,type,gl){
     const s = gl.createShader(type);
@@ -107,29 +168,31 @@ let score2 = 0;
 let penalties1 = 0;
 let penalties2 = 0;
 
+let nightMode = false; // Começa no modo Dia
+
+// Alternar com a tecla N
+window.addEventListener('keydown', e => {
+    if (e.key === 'n' || e.key === 'N') {
+        nightMode = !nightMode;
+    }
+});
+
 // Variável para controlar se o jogo está rodando
 let gameRunning = true;
 
 function updatePhysics() {
     if (keys['r'] || keys['R']) {
-        // Reset game
         resetGameSeed();
         player1 = { x: -1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
         player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
-        penalties1 = 0;
-        penalties2 = 0;
-        
-        // Resetar estado de vitória
+        penalties1 = 0; penalties2 = 0;
         gameRunning = true;
         document.getElementById('winner-msg').innerText = "GAME OVER";
         document.getElementById('game-over').style.display = 'none';
-        
-        // Resetar texto do placar para evitar delay visual
         document.getElementById('score1').innerText = "P1: 0";
         document.getElementById('score2').innerText = "P2: 0";
     }
     
-    // Se o jogo acabou, para a física
     if (!gameRunning) return;
     
     const speed = 0.1;
@@ -137,63 +200,87 @@ function updatePhysics() {
     const jumpForce = 0.2;
     const gravity = 0.01;
 
-    // Player 1
+    // === PLAYER 1 ===
+    // 1. Movimento Lateral (X) com Bloqueio
     let dx1 = 0;
-    
-    // Check collision before moving Z
-    if (!checkCollision(player1)) {
-        player1.z -= autoSpeed;
-    } else {
-        penalties1 += 1; // Lose points continuously while stuck
-    }
-    
     if (keys['a'] || keys['A']) { dx1 -= speed; }
     if (keys['d'] || keys['D']) { dx1 += speed; }
+
+    // Previsão: Onde estarei se me mover?
+    let nextX1 = player1.x + dx1;
     
-    player1.x += dx1;
-    // Rotation based on lateral movement + forward movement
+    // Se NÃO houver colisão na nova posição, aceita o movimento.
+    // Se houver, ignora o dx1 (trava na parede).
+    if (!checkCollision({x: nextX1, y: player1.y, z: player1.z})) {
+        player1.x = nextX1;
+    }
+
+    // 2. Movimento Frontal (Z)
+    // Se bater na frente, trava o avanço automático e soma penalidade
+    let nextZ1 = player1.z - autoSpeed;
+    if (!checkCollision({x: player1.x, y: player1.y, z: nextZ1})) {
+        player1.z = nextZ1;
+    } else {
+        penalties1 += 1;
+    }
+
+    // 3. Pulo e Altura do Chão
+    let floorY1 = getFloorHeight(player1.x, player1.z);
+    
     player1.rotation = Math.atan2(dx1, autoSpeed);
     player1.walkTime += 0.2;
 
-    if ((keys['w'] || keys['W']) && player1.y === 0) {
+    // Pular somente se estiver apoiado (no chão ou na mesa)
+    if ((keys['w'] || keys['W']) && Math.abs(player1.y - floorY1) < 0.05) {
         player1.vy = jumpForce;
     }
     
+    // Física Vertical
     player1.y += player1.vy;
     player1.vy -= gravity;
-    if (player1.y < 0) {
-        player1.y = 0;
+
+    // Aterrar (Snap)
+    if (player1.y < floorY1) {
+        player1.y = floorY1;
         player1.vy = 0;
     }
 
-    // Player 2
+
+    // === PLAYER 2 (Mesma Lógica) ===
     let dx2 = 0;
-    
-    if (!checkCollision(player2)) {
-        player2.z -= autoSpeed;
+    if (keys['ArrowLeft']) { dx2 -= speed; }
+    if (keys['ArrowRight']) { dx2 += speed; }
+
+    let nextX2 = player2.x + dx2;
+    if (!checkCollision({x: nextX2, y: player2.y, z: player2.z})) {
+        player2.x = nextX2;
+    }
+
+    let nextZ2 = player2.z - autoSpeed;
+    if (!checkCollision({x: player2.x, y: player2.y, z: nextZ2})) {
+        player2.z = nextZ2;
     } else {
         penalties2 += 1;
     }
 
-    if (keys['ArrowLeft']) { dx2 -= speed; }
-    if (keys['ArrowRight']) { dx2 += speed; }
-
-    player2.x += dx2;
+    let floorY2 = getFloorHeight(player2.x, player2.z);
+    
     player2.rotation = Math.atan2(dx2, autoSpeed);
     player2.walkTime += 0.2;
 
-    if (keys['ArrowUp'] && player2.y === 0) {
+    if (keys['ArrowUp'] && Math.abs(player2.y - floorY2) < 0.05) {
         player2.vy = jumpForce;
     }
 
     player2.y += player2.vy;
     player2.vy -= gravity;
-    if (player2.y < 0) {
-        player2.y = 0;
+
+    if (player2.y < floorY2) {
+        player2.y = floorY2;
         player2.vy = 0;
     }
 
-    // Bounds (Lateral only)
+    // Bounds
     player1.x = Math.max(-2.5, Math.min(2.5, player1.x));
     player2.x = Math.max(-2.5, Math.min(2.5, player2.x));
 
@@ -203,12 +290,9 @@ function updatePhysics() {
     document.getElementById('score1').innerText = "P1: " + score1;
     document.getElementById('score2').innerText = "P2: " + score2;
 
-    // Verifica Vitoria (500 pontos)
     if (score1 >= 500 || score2 >= 500) {
         gameRunning = false;
         let msg = score1 >= 500 ? "JOGADOR 1 VENCEU!" : "JOGADOR 2 VENCEU!";
-        
-        // Atualiza a tela
         const msgEl = document.getElementById('winner-msg');
         if (msgEl) msgEl.innerText = msg;
         document.getElementById('game-over').style.display = 'flex';
@@ -216,40 +300,40 @@ function updatePhysics() {
 }
 
 // ============== GERAR CENÁRIO DINÂMICO ==================
+// ============== GERAR CENÁRIO DINÂMICO ==================
 function generateScene(minZ, maxZ) {
     resetGeometry();
 
-    // Gerar chão/teto/paredes cobrindo a área de ambos os jogadores
+    // 1. ÁREA DE VISÃO
     const viewDist = 150;
     const backDist = 20;
     const startZ = maxZ + backDist;
     const endZ = minZ - viewDist;
 
-    // Piso
-    quad([-3.0,0,startZ],[3.0,0,startZ],[3.0,0,endZ],[-3.0,0,endZ],[0.82,0.82,0.75]);
-    // Teto
-    quad([-3.0,6,startZ],[3.0,6,startZ],[3.0,6,endZ],[-3.0,6,endZ],[0.9,0.88,0.85]);
-    // Paredes
-    quad([-3.0,0,startZ],[-3.0,6,startZ],[-3.0,6,endZ],[-3.0,0,endZ],[0.95,0.9,0.85]);
-    quad([3.0,0,startZ],[3.0,6,startZ],[3.0,6,endZ],[3.0,0,endZ],[0.95,0.9,0.85]);
+    // 2. CORREDOR
+    addCorridor(startZ, endZ);
 
-    // Start Elements
+    // 3. LÂMPADAS (NOVO)
+    const lightInterval = 12.0; 
+    
+    // Matemática para alinhar as luzes com o mundo (para não "andarem" com o jogador)
+    let firstLampIndex = Math.floor(startZ / lightInterval);
 
-    // Start Line at Z = 0
-    if (0 <= startZ && 0 >= endZ) {
-        // White strip
-        quad([-3.0, 0.01, 0.5], [3.0, 0.01, 0.5], [3.0, 0.01, -0.5], [-3.0, 0.01, -0.5], [1, 1, 1]);
+    for (let i = firstLampIndex; i * lightInterval > endZ; i--) {
+        let z = i * lightInterval;
+        // Chama a função do arquivo Lampada.js
+        // Se der erro aqui, é porque faltou o script no index.html!
+        addLamp(z); 
     }
 
-    // Mesas (Obstáculos)
+    // 4. OBSTÁCULOS (Mesas e Cadeiras)
     const spacing = 8;
-    let firstIndex = Math.floor(startZ / spacing);
+    let firstObsIndex = Math.floor(startZ / spacing);
     
-    for (let i = firstIndex; i * spacing > endZ; i--) {
+    for (let i = firstObsIndex; i * spacing > endZ; i--) {
         let z = i * spacing;
         
-        // Safe Zone: No obstacles before Z = -30
-        if (z > -30) continue;
+        if (z > -30) continue; // Zona segura
 
         const rowObstacles = getRowInfo(i);
         rowObstacles.forEach(obs => {
@@ -290,7 +374,13 @@ function updateCharacters() {
 
 // ============== RENDERIZAR ==================
 function renderView(gl, program, canvas, playerPos) {
-    gl.clearColor(0.1, 0.1, 0.15, 1);
+    // Muda a cor do fundo: Cinza azulado (Dia) ou Preto (Noite)
+    if (nightMode) {
+        gl.clearColor(0.05, 0.05, 0.05, 1); 
+    } else {
+        gl.clearColor(0.1, 0.1, 0.15, 1);
+    }
+    
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
@@ -310,8 +400,25 @@ function renderView(gl, program, canvas, playerPos) {
     const model = m4.identity();
     gl.uniformMatrix4fv(gl.getUniformLocation(program, "model"), false, model);
 
+    // === LUZES ===
+    
+    // Envia o estado do modo noturno (0 ou 1)
+    gl.uniform1f(gl.getUniformLocation(program, "uNightMode"), nightMode ? 1.0 : 0.0);
+
+    // Configuração do Modo Dia (Direcional)
     const lightDir = m4.normalize([0.5, 0.7, 1.0]);
     gl.uniform3fv(gl.getUniformLocation(program, "lightDir"), lightDir);
+
+    // Configuração do Modo Noite (Posição dos Holofotes)
+    const lightInterval = 12.0;
+    let baseIndex = Math.floor(playerPos.z / lightInterval);
+    let lights = [];
+    for (let i = -1; i <= 1; i++) {
+        lights.push(0);           
+        lights.push(5.9);         
+        lights.push((baseIndex + i) * lightInterval); 
+    }
+    gl.uniform3fv(gl.getUniformLocation(program, "uLightPos"), new Float32Array(lights));
 
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
 }

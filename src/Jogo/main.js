@@ -46,7 +46,7 @@ void main() {
 }
 `;
 
-// src/Jogo/main.js
+
 
 const fsSrc = `
 precision mediump float;
@@ -115,7 +115,7 @@ function compile(src,type,gl){
     return s;
 }
 
-// Criar programas para ambos os contextos
+
 const vs1 = compile(vsSrc,gl1.VERTEX_SHADER, gl1);
 const fs1 = compile(fsSrc,gl1.FRAGMENT_SHADER, gl1);
 const program1 = gl1.createProgram();
@@ -170,14 +170,14 @@ let penalties2 = 0;
 
 let nightMode = false; // Começa no modo Dia
 
-// Alternar com a tecla N
+
 window.addEventListener('keydown', e => {
     if (e.key === 'n' || e.key === 'N') {
         nightMode = !nightMode;
     }
 });
 
-// Variável para controlar se o jogo está rodando
+
 let gameRunning = true;
 
 function updatePhysics() {
@@ -201,22 +201,20 @@ function updatePhysics() {
     const gravity = 0.01;
 
     // === PLAYER 1 ===
-    // 1. Movimento Lateral (X) com Bloqueio
+    
     let dx1 = 0;
     if (keys['a'] || keys['A']) { dx1 -= speed; }
     if (keys['d'] || keys['D']) { dx1 += speed; }
 
-    // Previsão: Onde estarei se me mover?
+    
     let nextX1 = player1.x + dx1;
     
-    // Se NÃO houver colisão na nova posição, aceita o movimento.
-    // Se houver, ignora o dx1 (trava na parede).
+    
     if (!checkCollision({x: nextX1, y: player1.y, z: player1.z})) {
         player1.x = nextX1;
     }
 
-    // 2. Movimento Frontal (Z)
-    // Se bater na frente, trava o avanço automático e soma penalidade
+   
     let nextZ1 = player1.z - autoSpeed;
     if (!checkCollision({x: player1.x, y: player1.y, z: nextZ1})) {
         player1.z = nextZ1;
@@ -224,29 +222,29 @@ function updatePhysics() {
         penalties1 += 1;
     }
 
-    // 3. Pulo e Altura do Chão
+    
     let floorY1 = getFloorHeight(player1.x, player1.z);
     
     player1.rotation = Math.atan2(dx1, autoSpeed);
     player1.walkTime += 0.2;
 
-    // Pular somente se estiver apoiado (no chão ou na mesa)
+  
     if ((keys['w'] || keys['W']) && Math.abs(player1.y - floorY1) < 0.05) {
         player1.vy = jumpForce;
     }
     
-    // Física Vertical
+    
     player1.y += player1.vy;
     player1.vy -= gravity;
 
-    // Aterrar (Snap)
+    
     if (player1.y < floorY1) {
         player1.y = floorY1;
         player1.vy = 0;
     }
 
 
-    // === PLAYER 2 (Mesma Lógica) ===
+    // === PLAYER 2  ===
     let dx2 = 0;
     if (keys['ArrowLeft']) { dx2 -= speed; }
     if (keys['ArrowRight']) { dx2 += speed; }
@@ -280,11 +278,11 @@ function updatePhysics() {
         player2.vy = 0;
     }
 
-    // Bounds
+    
     player1.x = Math.max(-2.5, Math.min(2.5, player1.x));
     player2.x = Math.max(-2.5, Math.min(2.5, player2.x));
 
-    // Update Scores
+    
     score1 = Math.floor(-player1.z) - Math.floor(penalties1 / 10);
     score2 = Math.floor(-player2.z) - Math.floor(penalties2 / 10);
     document.getElementById('score1').innerText = "P1: " + score1;
@@ -299,41 +297,39 @@ function updatePhysics() {
     }
 }
 
-// ============== GERAR CENÁRIO DINÂMICO ==================
-// ============== GERAR CENÁRIO DINÂMICO ==================
+
 function generateScene(minZ, maxZ) {
     resetGeometry();
 
-    // 1. ÁREA DE VISÃO
+   
     const viewDist = 150;
     const backDist = 20;
     const startZ = maxZ + backDist;
     const endZ = minZ - viewDist;
 
-    // 2. CORREDOR
+    
     addCorridor(startZ, endZ);
 
-    // 3. LÂMPADAS (NOVO)
+    
     const lightInterval = 12.0; 
     
-    // Matemática para alinhar as luzes com o mundo (para não "andarem" com o jogador)
+    
     let firstLampIndex = Math.floor(startZ / lightInterval);
 
     for (let i = firstLampIndex; i * lightInterval > endZ; i--) {
         let z = i * lightInterval;
-        // Chama a função do arquivo Lampada.js
-        // Se der erro aqui, é porque faltou o script no index.html!
+       
         addLamp(z); 
     }
 
-    // 4. OBSTÁCULOS (Mesas e Cadeiras)
+    
     const spacing = 8;
     let firstObsIndex = Math.floor(startZ / spacing);
     
     for (let i = firstObsIndex; i * spacing > endZ; i--) {
         let z = i * spacing;
         
-        if (z > -30) continue; // Zona segura
+        if (z > -30) continue; 
 
         const rowObstacles = getRowInfo(i);
         rowObstacles.forEach(obs => {
@@ -343,9 +339,9 @@ function generateScene(minZ, maxZ) {
     }
 }
 
-// ============== ATUALIZAR GEOMETRIA ==================
+
 function updateCharacters() {
-    // Regenerar cenário baseado na posição de ambos os jogadores
+    
     const minZ = Math.min(player1.z, player2.z);
     const maxZ = Math.max(player1.z, player2.z);
     generateScene(minZ, maxZ);
@@ -372,9 +368,9 @@ function updateCharacters() {
     gl2.bufferData(gl2.ARRAY_BUFFER, normalData, gl2.STATIC_DRAW);
 }
 
-// ============== RENDERIZAR ==================
+
 function renderView(gl, program, canvas, playerPos) {
-    // Muda a cor do fundo: Cinza azulado (Dia) ou Preto (Noite)
+   
     if (nightMode) {
         gl.clearColor(0.05, 0.05, 0.05, 1); 
     } else {
@@ -400,16 +396,14 @@ function renderView(gl, program, canvas, playerPos) {
     const model = m4.identity();
     gl.uniformMatrix4fv(gl.getUniformLocation(program, "model"), false, model);
 
-    // === LUZES ===
-    
-    // Envia o estado do modo noturno (0 ou 1)
+   
     gl.uniform1f(gl.getUniformLocation(program, "uNightMode"), nightMode ? 1.0 : 0.0);
 
-    // Configuração do Modo Dia (Direcional)
+    
     const lightDir = m4.normalize([0.5, 0.7, 1.0]);
     gl.uniform3fv(gl.getUniformLocation(program, "lightDir"), lightDir);
 
-    // Configuração do Modo Noite (Posição dos Holofotes)
+    
     const lightInterval = 12.0;
     let baseIndex = Math.floor(playerPos.z / lightInterval);
     let lights = [];
@@ -423,7 +417,7 @@ function renderView(gl, program, canvas, playerPos) {
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
 }
 
-// ============== LOOP ==================
+
 function draw() {
     updatePhysics();
     updateCharacters();

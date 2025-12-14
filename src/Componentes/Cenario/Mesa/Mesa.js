@@ -1,7 +1,5 @@
 function addTable(x,z){
-    // Mudei de [1.0, 1.0, 1.0] para [0.85, 0.85, 0.85]
-    // Isso é "Branco Suficiente" para os olhos, mas baixo o suficiente 
-    // para não ativar o brilho automático das lâmpadas (que é > 0.90).
+   
     const tableColor = [0.85, 0.85, 0.85];
     
     const legColor = [0.4,0.25,0.15];

@@ -1,6 +1,5 @@
 function addChair(x, z) {
-    // Mudei de [0.1, 0.1, 0.1] para [0.6, 0.4, 0.2] (Tom de Madeira/Castanho)
-    // Assim ela vai brilhar quando o holofote passar por cima.
+    
     const chairColor = [0.6, 0.4, 0.2]; 
     
     // Seat

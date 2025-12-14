@@ -2,7 +2,7 @@
 let vertices = [];
 let colors = [];
 let normals = [];
-let texcoords = []; // Coordenadas de Textura
+let texcoords = [];
 
 function resetGeometry() {
     vertices = [];
@@ -15,12 +15,12 @@ function getGeometryData() {
     return { vertices, colors, normals, texcoords };
 }
 
-// Parâmetro 'usarTextura' define se aplica a imagem ou cor sólida
+
 function quad(a, b, c, d, color, usarTextura = true) {
     let v1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
     let v2 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
     
-    // Cálculo da Normal (Luz)
+
     let normal = [
         v1[1]*v2[2] - v1[2]*v2[1],
         v1[2]*v2[0] - v1[0]*v2[2],
@@ -32,9 +32,7 @@ function quad(a, b, c, d, color, usarTextura = true) {
     vertices.push(...a, ...b, ...c,  ...a, ...c, ...d);
     
     if (usarTextura) {
-        // === MAPEAMENTO DE MUNDO (WORLD SPACE) ===
-        // Usa as coordenadas X e Z reais para definir a textura.
-        // Isso faz o chão repetir a imagem a cada 2 metros (scale 0.5)
+        
         const scale = 0.5; 
 
         texcoords.push(
@@ -46,7 +44,7 @@ function quad(a, b, c, d, color, usarTextura = true) {
             d[0] * scale, d[2] * scale
         );
     } else {
-        // Paredes/Teto: Usa coordenada 0,0 para pegar uma cor sólida da textura
+        
         texcoords.push(
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0
@@ -64,7 +62,7 @@ function addCube(x,y,z, w,h,d, color) {
         [x-w, y-h, z-d], [x+w, y-h, z-d], [x+w, y+h, z-d], [x-w, y+h, z-d],
         [x-w, y-h, z+d], [x+w, y-h, z+d], [x+w, y+h, z+d], [x-w, y+h, z+d],
     ];
-    // A ordem foi alterada (2º e 4º parâmetros trocados) para a normal apontar para fora
+   
     quad(v[0],v[3],v[2],v[1],color, false); // Trás
     quad(v[1],v[2],v[6],v[5],color, false); // Direita
     quad(v[5],v[6],v[7],v[4],color, false); // Frente
@@ -89,7 +87,7 @@ function addRotatedCube(x, y, z, w, h, d, color, rotation) {
     });
     
     const v = tCorners;
-    // Mesma correção aplicada aqui para os personagens reagirem à luz
+    
     quad(v[0],v[3],v[2],v[1],color, false);
     quad(v[1],v[2],v[6],v[5],color, false);
     quad(v[5],v[6],v[7],v[4],color, false);

@@ -1,4 +1,4 @@
-// ================== SETUP ====================
+
 const canvas1 = document.getElementById("canvas1");
 const canvas2 = document.getElementById("canvas2");
 const gl1 = canvas1.getContext("webgl");
@@ -20,8 +20,6 @@ resize();
 window.onresize = resize;
 
 if (!gl1 || !gl2) alert("WebGL não suportado");
-
-// =============== SHADERS =====================
 
 const vsSrc = `
 attribute vec3 position;
@@ -159,7 +157,6 @@ function setupBuffers(gl, program) {
 let buffers1 = setupBuffers(gl1, program1);
 let buffers2 = setupBuffers(gl2, program2);
 
-// ============== POSIÇÕES DOS JOGADORES ==================
 let player1 = { x: -1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
 let player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
 
@@ -168,7 +165,7 @@ let score2 = 0;
 let penalties1 = 0;
 let penalties2 = 0;
 
-let nightMode = false; // Começa no modo Dia
+let nightMode = false; 
 
 
 window.addEventListener('keydown', e => {
@@ -178,7 +175,8 @@ window.addEventListener('keydown', e => {
 });
 
 
-let gameRunning = true;
+let gameRunning = false;
+let gameStarted = false;
 
 function updatePhysics() {
     if (keys['r'] || keys['R']) {
@@ -187,8 +185,10 @@ function updatePhysics() {
         player2 = { x: 1, y: 0, z: 0, vy: 0, rotation: 0, walkTime: 0 };
         penalties1 = 0; penalties2 = 0;
         gameRunning = true;
+        gameStarted = true;
         document.getElementById('winner-msg').innerText = "GAME OVER";
         document.getElementById('game-over').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'none';
         document.getElementById('score1').innerText = "P1: 0";
         document.getElementById('score2').innerText = "P2: 0";
     }
@@ -199,8 +199,6 @@ function updatePhysics() {
     const autoSpeed = 0.15;
     const jumpForce = 0.2;
     const gravity = 0.01;
-
-    // === PLAYER 1 ===
     
     let dx1 = 0;
     if (keys['a'] || keys['A']) { dx1 -= speed; }
@@ -244,7 +242,6 @@ function updatePhysics() {
     }
 
 
-    // === PLAYER 2  ===
     let dx2 = 0;
     if (keys['ArrowLeft']) { dx2 -= speed; }
     if (keys['ArrowRight']) { dx2 += speed; }

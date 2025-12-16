@@ -12,11 +12,8 @@
 <body>
     <canvas id="canvas"></canvas>
     
-    <!-- Dependencies -->
     <script src="../../utils/m4.js"></script>
     <script src="../../utils/geometry.js"></script>
-    
-    <!-- Component -->
     <script src="Personagens.js"></script>
 
     <script>
@@ -36,7 +33,6 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Shaders
         const vsSrc = `
             attribute vec3 position;
             attribute vec3 color;
@@ -85,7 +81,6 @@
         gl.linkProgram(program);
         gl.useProgram(program);
 
-        // Buffers
         const positionBuffer = gl.createBuffer();
         const colorBuffer = gl.createBuffer();
         const normalBuffer = gl.createBuffer();
@@ -98,11 +93,8 @@
         gl.enableVertexAttribArray(colorLoc);
         gl.enableVertexAttribArray(normalLoc);
 
-        // Scene Setup
         resetGeometry();
         
-        // CALL COMPONENT FUNCTION HERE
-        // addCharacter(px, pz, skinColor, shirtColor, pantsColor, hairColor, eyeColor, rotation, walkTime, py)
         addCharacter(0, 0, [1.0, 0.8, 0.6], [0.2, 0.2, 0.8], [0.1, 0.1, 0.1], [0.2, 0.1, 0.0], [1.0, 1.0, 1.0]);
 
         const data = getGeometryData();
@@ -119,12 +111,10 @@
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data.normals), gl.STATIC_DRAW);
         gl.vertexAttribPointer(normalLoc, 3, gl.FLOAT, false, 0, 0);
 
-        // Uniforms
         const projectionLoc = gl.getUniformLocation(program, "projection");
         const viewLoc = gl.getUniformLocation(program, "view");
         const modelLoc = gl.getUniformLocation(program, "model");
 
-        // Render Loop
         let cameraAngle = 0;
 
         function draw() {
@@ -135,7 +125,6 @@
             const aspect = canvas.width / canvas.height;
             const projection = m4.perspective(Math.PI / 4, aspect, 0.1, 100);
             
-            // Camera rotating around center
             const radius = 5;
             const camX = Math.sin(cameraAngle) * radius;
             const camZ = Math.cos(cameraAngle) * radius;

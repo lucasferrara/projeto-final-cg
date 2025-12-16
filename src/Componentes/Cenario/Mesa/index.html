@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualização - Mesa</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #333; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <!-- Dependencies -->
+    <script src="../../../utils/m4.js"></script>
+    <script src="../../../utils/geometry.js"></script>
+    
+    <!-- Component -->
+    <script src="Mesa.js"></script>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const gl = canvas.getContext("webgl");
+
+        if (!gl) {
+            alert("WebGL not supported");
+            throw new Error("WebGL not supported");
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Shaders
+        const vsSrc = `
+            attribute vec3 position;
+            attribute vec3 color;
+            attribute vec3 normal;
+
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+
+            varying vec3 vColor;
+            varying vec3 vNormal;
+
+            void main() {
+                vColor = color;
+                vNormal = normalize(mat3(model) * normal);
+                gl_Position = projection * view * model * vec4(position, 1.0);
+            }
+        `;
+
+        const fsSrc = `
+            precision mediump float;
+
+            varying vec3 vColor;
+            varying vec3 vNormal;
+
+            void main() {
+                vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+                float light = max(dot(vNormal, lightDir), 0.0) * 0.7 + 0.3;
+                gl_FragColor = vec4(vColor * light, 1.0);
+            }
+        `;
+
+        function compile(src, type) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(s));
+            }
+            return s;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(vsSrc, gl.VERTEX_SHADER));
+        gl.attachShader(program, compile(fsSrc, gl.FRAGMENT_SHADER));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        // Buffers
+        const positionBuffer = gl.createBuffer();
+        const colorBuffer = gl.createBuffer();
+        const normalBuffer = gl.createBuffer();
+
+        const positionLoc = gl.getAttribLocation(program, "position");
+        const colorLoc = gl.getAttribLocation(program, "color");
+        const normalLoc = gl.getAttribLocation(program, "normal");
+
+        gl.enableVertexAttribArray(positionLoc);
+        gl.enableVertexAttribArray(colorLoc);
+        gl.enableVertexAttribArray(normalLoc);
+
+        // Scene Setup
+        resetGeometry();
+        
+        // CALL COMPONENT FUNCTION HERE
+        addTable(0, 0);
+
+        const data = getGeometryData();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data.vertices), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data.colors), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data.normals), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(normalLoc, 3, gl.FLOAT, false, 0, 0);
+
+        // Uniforms
+        const projectionLoc = gl.getUniformLocation(program, "projection");
+        const viewLoc = gl.getUniformLocation(program, "view");
+        const modelLoc = gl.getUniformLocation(program, "model");
+
+        // Render Loop
+        let cameraAngle = 0;
+
+        function draw() {
+            gl.clearColor(0.2, 0.2, 0.2, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
+
+            const aspect = canvas.width / canvas.height;
+            const projection = m4.perspective(Math.PI / 4, aspect, 0.1, 100);
+            
+            // Camera rotating around center
+            const radius = 5;
+            const camX = Math.sin(cameraAngle) * radius;
+            const camZ = Math.cos(cameraAngle) * radius;
+            const camY = 3;
+            
+            const view = m4.inverse(m4.lookAt([camX, camY, camZ], [0, 0, 0], [0, 1, 0]));
+            const model = m4.identity();
+
+            gl.uniformMatrix4fv(projectionLoc, false, projection);
+            gl.uniformMatrix4fv(viewLoc, false, view);
+            gl.uniformMatrix4fv(modelLoc, false, model);
+
+            gl.drawArrays(gl.TRIANGLES, 0, data.vertices.length / 3);
+
+            cameraAngle += 0.01;
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
